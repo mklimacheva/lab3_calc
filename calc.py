@@ -5,7 +5,12 @@ import operator as op
 import argparse
 
 # Парсер аргументов командной строки
-parser = argparse.ArgumentParser()
+parser = argparse.ArgumentParser(
+prog="Калькулятор",
+description="Вычисление выражений",
+ epilog="Использование: python calc.py '1+1'",
+)
+
 parser.add_argument("-t", "--test", action="store_true", help="Запустить тесты")
 
 # Поддерживаемые операторы
