@@ -11,6 +11,7 @@ description="Вычисление выражений",
  epilog="Использование: python calc.py '1+1'",
 )
 
+parser.add_argument("expression", nargs="?", help="Математическое выражение для вычисления.")
 parser.add_argument("-t", "--test", action="store_true", help="Запустить тесты")
 
 # Поддерживаемые операторы
@@ -103,8 +104,8 @@ def run_tests():
     print("Тесты завершены.")
 
 if __name__ == "__main__":
-    args = parser.parse_args()
-    if args.test:
+    args = parser.parse_args()  # Парсим аргументы командной строки
+    if args.test:  # Если передан аргумент -t или --test
         run_tests()
     else:
         if len(sys.argv) != 2:
