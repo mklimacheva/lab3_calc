@@ -1,18 +1,17 @@
-from prettytable import PrettyTable
 import sys
 import ast
 import operator as op
 import argparse
+import math
 
 # Парсер аргументов командной строки
 parser = argparse.ArgumentParser(
-prog="Калькулятор",
-description="Вычисление выражений",
- epilog="Использование: python calc.py '1+1'",
+    prog="Калькулятор",
+    description="Вычисление выражений",
+    epilog="Использование: python calc.py '1+1'",
 )
 
 parser.add_argument("expression", nargs="?", help="Математическое выражение для вычисления.")
-parser.add_argument("-t", "--test", action="store_true", help="Запустить тесты")
 
 # Поддерживаемые операторы
 operators = {
@@ -42,6 +41,7 @@ def evaluate_expression(node):
 def calculate(expression):
     """
     Вычисляет значение математического выражения.
+    Возвращает результат вычисления или выбрасывает исключение в случае ошибки.
     """
     try:
         # Удаляем лишние пробелы, оставляя по одному пробелу между элементами
@@ -57,63 +57,27 @@ def calculate(expression):
         # Вычисляем выражение
         result = evaluate_expression(tree.body)
         
+        # Проверка на арифметическое переполнение
+        if math.isinf(result) or math.isnan(result):
+            raise OverflowError("Арифметическое переполнение.")
+        
         return result
     except (SyntaxError, TypeError, KeyError) as e:
-        print(f"Ошибка: Некорректное выражение. {e}")
-        return None
+        raise ValueError(f"Некорректное выражение: {e}")
     except ZeroDivisionError:
-        print("Ошибка: Деление на ноль.")
-        return None
-
-def run_tests():
-    """
-    Запускает тесты для проверки всех путей выполнения.
-    """
-    test_cases = [
-        # Корректные выражения
-        ("1 + 1", 2),
-        ("2 * 3 + 4", 10),
-        ("10 / 2 - 1", 4.0),
-        ("-5 + 10", 5),
-        ("1 + 1 / 4", 1.25),
-        
-        # Ошибки синтаксиса
-        ("(1 + 1)", None),  # Некорректный синтаксис (скобки)
-        ("a", None),        # Некорректный синтаксис (неизвестный символ)
-        ("1 + ", None),     # Незавершенное выражение
-        ("2 ** 3", None),   # Возведение в степень (неподдерживаемая операция)
-        
-        # Деление на ноль
-        ("1 / 0", None),    # Деление на ноль
-        
-        # Неподдерживаемые операции
-        ("1 % 2", None),    # Неподдерживаемый оператор %
-    ]
-
-    # Создаем таблицу
-    table = PrettyTable()
-    table.field_names = ["Выражение", "Ожидаемый результат", "Полученный", "Вывод"]
-
-    print("Запуск тестов...")
-    for i, (expression, expected) in enumerate(test_cases, 1):
-        result = calculate(expression)
-        stroka = "Тест пройден" if result == expected else "Тест не пройден"
-        table.add_row([expression, expected, result, stroka])
-    
-    print(table)
-    print("Тесты завершены.")
+        raise ZeroDivisionError("Деление на ноль.")
 
 if __name__ == "__main__":
     args = parser.parse_args()  # Парсим аргументы командной строки
-    if args.test:  # Если передан аргумент -t или --test
-        run_tests()
-    else:
-        if len(sys.argv) != 2:
-            print("Использование: python calculator.py <выражение>")
-            sys.exit(1)
+    if not args.expression:
+        parser.print_help()
+        sys.exit(1)
         
-        # Передаем выражение целиком (все, что после имени скрипта)
-        expression = sys.argv[1]
+    # Передаем выражение целиком (все, что после имени скрипта)
+    expression = args.expression
+    try:
         result = calculate(expression)
-        if result is not None:
-            print(f"Результат: {result}")
+        print(f"Результат: {result}")
+    except Exception as e:
+        print(f"Ошибка: {e}", file=sys.stderr)
+        sys.exit(1)
