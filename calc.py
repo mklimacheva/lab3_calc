@@ -22,26 +22,25 @@ operators = {
     ast.USub: op.neg,
 }
 
-def evaluate_expression(node):
+def evaluate(node):
     """
     Рекурсивно вычисляет значение выражения, представленного в виде AST.
     """
     if isinstance(node, ast.Constant):  # Число
         return node.value
     elif isinstance(node, ast.BinOp):  # Бинарная операция
-        left = evaluate_expression(node.left)
-        right = evaluate_expression(node.right)
+        left = evaluate(node.left)
+        right = evaluate(node.right)
         return operators[type(node.op)](left, right)
     elif isinstance(node, ast.UnaryOp):  # Унарная операция
-        operand = evaluate_expression(node.operand)
+        operand = evaluate(node.operand)
         return operators[type(node.op)](operand)
     else:
-        raise TypeError("Неизвестная операция")
+        raise TypeError("Неверное выражение")
 
-def calculate(expression):
+def parse(expression):
     """
-    Вычисляет значение математического выражения.
-    Возвращает результат вычисления или выбрасывает исключение в случае ошибки.
+    Преобразует выражение в дерево AST.
     """
     try:
         # Удаляем лишние пробелы, оставляя по одному пробелу между элементами
@@ -51,11 +50,41 @@ def calculate(expression):
         if "(" in expression or ")" in expression:
             raise SyntaxError("Выражение содержит скобки, которые не поддерживаются.")
         
+        # Проверяем, есть ли в выражении буквы (кроме экспоненциальной записи)
+        if any(c.isalpha() and c not in 'eE' for c in expression):
+            raise ValueError("Неверное выражение")
+        
+        # Проверяем, есть ли в выражении степень
+        if "**" in expression:
+            raise ValueError("Степень не поддерживается")
+        
         # Парсим выражение в AST
         tree = ast.parse(expression, mode='eval')
         
+        return tree.body
+    except SyntaxError as e:
+        if "invalid syntax" in str(e):
+            raise ValueError("Неполное выражение")
+        else:
+            raise ValueError(f"Некорректное выражение: {e}")
+    except (TypeError, KeyError) as e:
+        raise ValueError(f"Некорректное выражение: {e}")
+
+def calculate(expression):
+    """
+    Вычисляет значение математического выражения.
+    Возвращает результат вычисления или выбрасывает исключение в случае ошибки.
+    """
+    try:
+        # Если выражение является строкой, парсим его в AST
+        if isinstance(expression, str):
+            tree = parse(expression)
+        else:
+            # Если выражение уже является деревом AST, используем его
+            tree = expression
+        
         # Вычисляем выражение
-        result = evaluate_expression(tree.body)
+        result = evaluate(tree)
         
         # Проверка на арифметическое переполнение
         if math.isinf(result) or math.isnan(result):
@@ -66,6 +95,8 @@ def calculate(expression):
         raise ValueError(f"Некорректное выражение: {e}")
     except ZeroDivisionError:
         raise ZeroDivisionError("Деление на ноль.")
+    except OverflowError:
+        raise OverflowError("Арифметическое переполнение.")
 
 if __name__ == "__main__":
     args = parser.parse_args()  # Парсим аргументы командной строки
