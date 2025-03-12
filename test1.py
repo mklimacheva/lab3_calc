@@ -1,33 +1,30 @@
+import unittest
 from prettytable import PrettyTable
-from calc import calculate  # Импортируем функции из calc.py
+from calc import calculate
+from calc import parse
 import ast
 
 def parse_tree_string(tree_str):
-    """
-    Преобразует строку с деревом выражений (например, "Add(2, 2)") в AST.
-    Поддерживает вложенные выражения, такие как "Div(1, Sub(2, 2))".
-    """
+    #Преобразуем строку с деревом выражений Add(2, 2) в AST.
     try:
         # Удаляем пробелы
         tree_str = tree_str.replace(" ", "")
-
         # Определяем операцию и аргументы
         if tree_str.startswith("Add"):
             op = ast.Add()
             args_str = tree_str[4:-1]  # Убираем "Add(" и ")"
         elif tree_str.startswith("Sub"):
             op = ast.Sub()
-            args_str = tree_str[4:-1]  # Убираем "Sub(" и ")"
+            args_str = tree_str[4:-1]  
         elif tree_str.startswith("Mult"):
             op = ast.Mult()
-            args_str = tree_str[5:-1]  # Убираем "Mult(" и ")"
+            args_str = tree_str[5:-1]  
         elif tree_str.startswith("Div"):
             op = ast.Div()
-            args_str = tree_str[4:-1]  # Убираем "Div(" и ")"
+            args_str = tree_str[4:-1]  
         else:
-            # Если строка не начинается с операции, это может быть число
+            # Если строка не начинается с операции
             try:
-                # Пробуем преобразовать строку в число
                 value = float(tree_str)
                 return ast.Constant(value=value)
             except ValueError:
@@ -46,10 +43,7 @@ def parse_tree_string(tree_str):
         raise ValueError(e)
 
 def split_arguments(args_str):
-    """
-    Разделяет строку аргументов на левый и правый аргументы.
-    Учитывает вложенные выражения.
-    """
+    # Разделяем аргументы
     balance = 0  # Счетчик для отслеживания вложенности
     for i, char in enumerate(args_str):
         if char == "(":
@@ -62,19 +56,14 @@ def split_arguments(args_str):
     raise ValueError(f"Не удалось разделить аргументы: {args_str}")
 
 def parse_argument(arg_str):
-    """
-    Разбирает аргумент: либо число, либо вложенное выражение.
-    """
-    if arg_str.replace(".", "", 1).replace("e", "", 1).replace("E", "", 1).isdigit():  # Проверяем, является ли аргумент числом
+    # Проверяем, является ли аргумент числом
+    if arg_str.replace(".", "", 1).replace("e", "", 1).isdigit():  
         return ast.Constant(value=float(arg_str))
     else:
-        # Если это не число, то это вложенное выражение
         return parse_tree_string(arg_str)
 
 def ast_to_str(node):
-    """
-    Преобразует дерево AST в строковое представление.
-    """
+   #Преобразуем дерево AST в строковое представление.
     if isinstance(node, ast.Expression):
         return ast_to_str(node.body)
     elif isinstance(node, ast.BinOp):
@@ -89,126 +78,80 @@ def ast_to_str(node):
         op = type(node.op).__name__
         return f"{op}({operand})"
     else:
-        raise ValueError(f"Unsupported node type: {type(node)}")
+        raise ValueError(f"Неподдерживаемый тип узла: {type(node)}")
 
-def run_parser_tests():
-    """
-    Запускает тесты и выводит результаты в виде таблицы.
-    """
-    # Создаем таблицу для вывода результатов
-    table = PrettyTable()
-    table.field_names = [
-        "Введенное выражение", 
-        "Дерево выражений"
-    ]
+class TestParser(unittest.TestCase):
+    def test_expressions(self):
+        table = PrettyTable()
+        table.field_names = [
+            "Введенное выражение", 
+            "Дерево выражений"
+        ]
+        test_cases = [
+            ("42", 42),
+            ("3.14", 3.14),
+            ("2 + 3", 5),
+            ("5 * 6", 30),
+            ("50 / 0.5", 100.0),
+            ("500 - 800", -300.0),
+            ("2 + 3 * 4", 14),
+            ("10 - 4 / 2", 8.0),
+            ("0.25 / 0.001 + 0.081 * 25", 252.025),
+            ("a", ValueError),
+            ("2 /", ValueError),
+            ("5**4", ValueError),
+            ("(1 + 1)", SyntaxError),
+            ("1e300 / 1e-300", OverflowError),
+        ]
+        for expression, expected in test_cases:
+            try:
+                # Парсим выражение в AST
+                tree = parse(expression)
+                result = ast_to_str(tree)
+            except Exception as e:
+                result = e
+            table.add_row([expression, result])
+        print("\nТесты для парсера:")
+        print(table)
 
-    # Определяем тестовые случаи
-    test_cases = [
-        # Корректные выражения
-        ("42", 42, None, None),
-        ("3.14", 3.14, None, None),
-        ("2 + 3", 5, None, None),
-        ("5 * 6", 30, None, None),
-        ("50 / 0.5", 100.0, None, None),
-        ("500 - 800", -300.0, None, None),
-        ("2 + 3 * 4", 14, None, None),
-        ("10 - 4 / 2", 8.0, None, None),
-        ("0.25 / 0.001 + 0.081 * 25", 252.025, None, None),
+class TestCalculator(unittest.TestCase):
+    def test_calculations(self):
+        calculator_table = PrettyTable()
+        calculator_table.field_names = [
+            "Дерево выражений", 
+            "Ожидаемый результат", 
+            "Полученный результат", 
+            "Статус"
+        ]
+        test_cases = [
+            ("Add(2,2)", 4, None),
+            ("Mult(3,4)", 12, None),
+            ("Div(10,2)", 5.0, None),
+            ("Sub(10, 5)", 5, None),
+            ("Div(2, 0)", None, ZeroDivisionError),
+            ("Div(1, Sub(2, 2))", None, ZeroDivisionError), 
+            ("Add(1, 4j)", None, ValueError),
+            ("Div(1e300, 1e-300)", None, OverflowError),
+        ]
 
-        # Некорректные выражения
-        ("a", None, None, None),
-        ("2 /", None, None, None),
-        ("5**4", None, None, None),
-        ("(1 + 1)", None, None, None),
-        ("1e300 / 1e-300", None, None, None),
-    ]
-
-    # Запускаем тесты
-    for expression, expected, _, _ in test_cases:
-        try:
-            # Проверяем, есть ли в выражении скобки
-            if "(" in expression or ")" in expression:
-                raise SyntaxError("Выражение содержит скобки, которые не поддерживаются.")
-        
-            # Проверяем, есть ли в выражении степень
-            if "**" in expression:
-                raise ValueError("Степень не поддерживается")
-        
-            # Удаляем лишние пробелы, оставляя по одному пробелу между элементами
-            expression = " ".join(expression.split())
-        
-            # Парсим выражение в AST
-            tree = ast.parse(expression, mode='eval')
-            result = ast_to_str(tree)
-        
-            
-        except SyntaxError as e:
-            if "invalid syntax" in str(e):
-                result = "Неполное выражение"
-            else:
-                result = f"Некорректное выражение: {e}"
-        except (TypeError, KeyError, ValueError) as e:
-            result = f"Некорректное выражение: {e}"
-        except Exception as e:
-            result = f"Неизвестная ошибка: {e}"
-
-        # Добавляем строку в таблицу
-        table.add_row([expression, result])
-
-    # Выводим таблицу
-    print("\nТесты для парсера:")
-    print(table)
-    
-
-def run_calculator_tests():
-    """
-    Запускает тесты для вычислителя и выводит результаты в виде таблицы.
-    """
-    # Создаем таблицу для вывода результатов
-    calculator_table = PrettyTable()
-    calculator_table.field_names = [
-        "Дерево выражений", 
-        "Ожидаемый результат", 
-        "Полученный результат", 
-        "Статус"
-    ]
-
-    # Определяем тестовые случаи для вычислителя
-    calculator_test_cases = [
-        # Корректные выражения
-        ("Add(2,2)", 4, None),
-        ("Mult(3,4)", 12, None),
-        ("Div(10,2)", 5.0, None),
-        ("Sub(10, 5)", 5, None),
-
-        # Невозможные арифметические операции
-        ("Div(2, 0)", None, "Ошибка: деление на ноль"),
-        ("Div(1, Sub(2, 2))", None, "Ошибка: деление на ноль"),  
-        ("Add(1, 4j)", None, "Ошибка: неверное выражение"),
-        ("Div(1e300, 1e-300)", None, "Ошибка: арифметическое переполнение"),
-    ]
-
-    # Запускаем тесты для вычислителя
-    for tree_str, expected, _ in calculator_test_cases:
-        try:
-            # Преобразуем строку с деревом выражений в AST
-            tree = parse_tree_string(tree_str)
-            # Вычисляем результат
-# Вычисляем выражение
-            result = calculate(tree)
-            # Проверяем, совпадает ли результат с ожидаемым
-            status = "Тест пройден" if result == expected else "Тест не пройден"
-        except Exception as e:
-            result = str(e)
-            status = "Ошибка"
-
-        # Добавляем строку в таблицу
-        calculator_table.add_row([tree_str, expected, result, status])
-
-    # Выводим таблицу
-    print("\nТесты для вычислителя:")
-    print(calculator_table)
+        for tree_str, expected, expected_exception in test_cases:
+            try:
+                # Преобразуем строку с деревом выражений в AST
+                tree = parse_tree_string(tree_str)
+                result = calculate(tree)
+                if expected_exception is not None:
+                    status = "Тест не пройден"
+                else:
+                    status = "Тест пройден" if result == expected else "Тест не пройден"
+            except Exception as e:
+                result = str(e)
+                if expected_exception is not None and isinstance(e, expected_exception):
+                    status = "Тест пройден"
+                else:
+                    status = "Ошибка"
+            calculator_table.add_row([tree_str, expected, result, status])
+        print("\nТесты для вычислителя:")
+        print(calculator_table)
 
 if __name__ == "__main__":
-    run_parser_tests()
-    run_calculator_tests()
+    unittest.main()
