@@ -18,19 +18,20 @@ operators = {
     ast.Mult: op.mul,
     ast.Div: op.truediv,
     ast.USub: op.neg,
+    ast.Pow: op.pow,
 }
 
 def parse(expression):
-    #Преобразуем выражение в дерево AST
+    # Преобразуем выражение в дерево AST
     try:
         # Удаляем лишние пробелы
         expression = " ".join(expression.split())
-        if "(" in expression or ")" in expression:
-            raise ValueError("Выражение содержит скобки, которые не поддерживаются.")
+        
+        # Проверяем на наличие недопустимых символов, кроме 'e' и 'E' для научной нотации
         if any(c.isalpha() and c not in 'eE' for c in expression):
             raise ValueError("Выражение содержит неверные символы")
-        if "**" in expression:
-            raise ValueError("Степень не поддерживается")
+        
+        # Парсим выражение в AST
         tree = ast.parse(expression, mode='eval')
         return tree.body
     except SyntaxError as e:
@@ -42,7 +43,7 @@ def parse(expression):
         raise ValueError(f"Некорректное выражение: {e}")
 
 def evaluate(node):
-    #Рекурсивно вычисляем значение выражения, представленного в виде AST
+    # Рекурсивно вычисляем значение выражения, представленного в виде AST
     if isinstance(node, ast.Constant):  
         return node.value
     elif isinstance(node, ast.BinOp):  

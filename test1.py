@@ -1,14 +1,16 @@
 import unittest
 from prettytable import PrettyTable
-from calc import calculate
-from calc import parse
+from calc import calculate, parse, evaluate
 import ast
 
 def parse_tree_string(tree_str):
-    #Преобразуем строку с деревом выражений Add(2, 2) в AST.
+    """
+    Преобразуем строку с деревом выражений Add(2, 2) в AST.
+    """
     try:
         # Удаляем пробелы
         tree_str = tree_str.replace(" ", "")
+
         # Определяем операцию и аргументы
         if tree_str.startswith("Add"):
             op = ast.Add()
@@ -21,6 +23,9 @@ def parse_tree_string(tree_str):
             args_str = tree_str[5:-1]  
         elif tree_str.startswith("Div"):
             op = ast.Div()
+            args_str = tree_str[4:-1]  
+        elif tree_str.startswith("Pow"):  
+            op = ast.Pow()
             args_str = tree_str[4:-1]  
         else:
             # Если строка не начинается с операции
@@ -63,7 +68,7 @@ def parse_argument(arg_str):
         return parse_tree_string(arg_str)
 
 def ast_to_str(node):
-   #Преобразуем дерево AST в строковое представление.
+    # Преобразуем дерево AST в строковое представление.
     if isinstance(node, ast.Expression):
         return ast_to_str(node.body)
     elif isinstance(node, ast.BinOp):
@@ -79,6 +84,7 @@ def ast_to_str(node):
         return f"{op}({operand})"
     else:
         raise ValueError(f"Неподдерживаемый тип узла: {type(node)}")
+
 class TestParser(unittest.TestCase):
     def test_expressions(self):
         table = PrettyTable()
@@ -100,8 +106,10 @@ class TestParser(unittest.TestCase):
             ("0.25 / 0.001 + 0.081 * 25", "Add(Div(0.25, 0.001), Mult(0.081, 25))", None),
             ("a", None, ValueError),
             ("2 /", None,  ValueError),
-            ("5**4", None, ValueError),
-            ("(1 + 1)", None, ValueError),
+            ("5**4", "Pow(5, 4)", None),
+            ("(1 + 1)", "Add(1, 1)", None),
+            ("1e+03", "1000.0", None),
+
         ]
 
         for tree_str, expected, expected_exception in test_cases:
@@ -134,7 +142,7 @@ class TestCalculator(unittest.TestCase):
             "Статус"
         ]
         test_cases = [
-            ("Add(2,2)", 4, None),
+	    ("Add(2,2)", 4, None),
             ("Mult(3,4)", 12, None),
             ("Div(10,2)", 5.0, None),
             ("Sub(10, 5)", 5, None),
@@ -142,6 +150,8 @@ class TestCalculator(unittest.TestCase):
             ("Div(1, Sub(2, 2))", None, ZeroDivisionError), 
             ("Add(1, 4j)", None, ValueError),
             ("Div(1e300, 1e-300)", None, OverflowError),
+            ("Pow(5, 4)", 625, None),
+            ("Div(1e+03, 500)", 2, None),
         ]
 
         for tree_str, expected, expected_exception in test_cases:
@@ -163,5 +173,61 @@ class TestCalculator(unittest.TestCase):
         print("\nТесты для вычислителя:")
         print(calculator_table)
 
+class TestIntegration(unittest.TestCase):
+    def test_integration(self):
+        integration_table = PrettyTable()
+        integration_table.field_names = [
+            "Введенное выражение", 
+            "Ожидаемый результат", 
+            "Полученный результат", 
+            "Статус"
+        ]
+        test_cases = [
+            ("1 + 1", 2, None),
+            ("2 * 3", 6, None),
+            ("10 / 2", 5.0, None),
+            ("5 - 3", 2, None),
+            ("2 ** 3", 8, None),
+            ("2 + (3 * 4)", 14, None),
+	    ("3.375e+09**(1/3)", 1500, None),
+	    ("1 / 0", None, ZeroDivisionError),
+            ("a + 1", None, ValueError),
+            ("1e300 / 1e-300", None, OverflowError),
+        ]
+
+        for expression, expected, expected_exception in test_cases:
+            try:
+                # Парсим выражение и вычисляем результат
+                result = calculate(expression)
+                if expected_exception is not None:
+                    status = "Тест не пройден"
+                else:
+                    status = "Тест пройден" if (abs(result - expected) < 1e-06) else "Тест не пройден"
+            except Exception as e:
+                result = str(e)
+                if expected_exception is not None and isinstance(e, expected_exception):
+                    status = "Тест пройден"
+                else:
+                    status = "Ошибка"
+            integration_table.add_row([expression, expected, result, status])
+        
+        print("\nИнтеграционные тесты (parse + evaluate):")
+        print(integration_table)
+
 if __name__ == "__main__":
-    unittest.main()
+    # Создаем TestSuite и добавляем тесты в нужном порядке
+    loader = unittest.TestLoader()
+    suite = unittest.TestSuite()
+
+    # Добавляем тесты для парсера
+    suite.addTest(loader.loadTestsFromTestCase(TestParser))
+
+    # Добавляем тесты для вычислителя
+    suite.addTest(loader.loadTestsFromTestCase(TestCalculator))
+
+    # Добавляем интеграционные тесты
+    suite.addTest(loader.loadTestsFromTestCase(TestIntegration))
+
+    # Запускаем тесты
+    runner = unittest.TextTestRunner()
+    runner.run(suite)
