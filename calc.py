@@ -26,7 +26,7 @@ def parse(expression):
         # Удаляем лишние пробелы
         expression = " ".join(expression.split())
         if "(" in expression or ")" in expression:
-            raise SyntaxError("Выражение содержит скобки, которые не поддерживаются.")
+            raise ValueError("Выражение содержит скобки, которые не поддерживаются.")
         if any(c.isalpha() and c not in 'eE' for c in expression):
             raise ValueError("Выражение содержит неверные символы")
         if "**" in expression:

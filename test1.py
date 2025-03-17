@@ -79,38 +79,48 @@ def ast_to_str(node):
         return f"{op}({operand})"
     else:
         raise ValueError(f"Неподдерживаемый тип узла: {type(node)}")
-
 class TestParser(unittest.TestCase):
     def test_expressions(self):
         table = PrettyTable()
         table.field_names = [
             "Введенное выражение", 
-            "Дерево выражений"
+            "Ожидаемый результат", 
+            "Полученный результат", 
+            "Статус"
         ]
         test_cases = [
-            ("42", 42),
-            ("3.14", 3.14),
-            ("2 + 3", 5),
-            ("5 * 6", 30),
-            ("50 / 0.5", 100.0),
-            ("500 - 800", -300.0),
-            ("2 + 3 * 4", 14),
-            ("10 - 4 / 2", 8.0),
-            ("0.25 / 0.001 + 0.081 * 25", 252.025),
-            ("a", ValueError),
-            ("2 /", ValueError),
-            ("5**4", ValueError),
-            ("(1 + 1)", SyntaxError),
-            ("1e300 / 1e-300", OverflowError),
+            ("42", "42", None),
+            ("3.14", "3.14", None),
+            ("2 + 3", "Add(2, 3)", None),
+            ("5 * 6", "Mult(5, 6)", None),
+            ("50 / 0.5", "Div(50, 0.5)", None),
+            ("500 - 800", "Sub(500, 800)", None),
+            ("2 + 3 * 4", "Add(2, Mult(3, 4))", None),
+            ("10 - 4 / 2", "Sub(10, Div(4, 2))", None),
+            ("0.25 / 0.001 + 0.081 * 25", "Add(Div(0.25, 0.001), Mult(0.081, 25))", None),
+            ("a", None, ValueError),
+            ("2 /", None,  ValueError),
+            ("5**4", None, ValueError),
+            ("(1 + 1)", None, ValueError),
         ]
-        for expression, expected in test_cases:
+
+        for tree_str, expected, expected_exception in test_cases:
             try:
                 # Парсим выражение в AST
-                tree = parse(expression)
+                tree = parse(tree_str)  
                 result = ast_to_str(tree)
+                if expected_exception is not None:
+                    status = "Тест не пройден"
+                else:
+                    status = "Тест пройден" if result == expected else "Тест не пройден"
             except Exception as e:
-                result = e
-            table.add_row([expression, result])
+                result = str(e)
+                if expected_exception is not None and isinstance(e, expected_exception):
+                    status = "Тест пройден"
+                else:
+                    status = "Ошибка"
+            table.add_row([tree_str, expected, result, status])
+        
         print("\nТесты для парсера:")
         print(table)
 
