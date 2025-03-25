@@ -18,7 +18,7 @@ operators = {
     ast.Mult: op.mul,
     ast.Div: op.truediv,
     ast.USub: op.neg,
-    ast.Pow: op.pow,
+    ast.Pow: op.pow,  
 }
 
 def parse(expression):
@@ -30,6 +30,9 @@ def parse(expression):
         # Проверяем на наличие недопустимых символов, кроме 'e' и 'E' для научной нотации
         if any(c.isalpha() and c not in 'eE' for c in expression):
             raise ValueError("Выражение содержит неверные символы")
+        
+        # Заменяем ^ на ** для корректного парсинга
+        expression = expression.replace('^', '**')
         
         # Парсим выражение в AST
         tree = ast.parse(expression, mode='eval')

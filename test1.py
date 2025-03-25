@@ -4,9 +4,7 @@ from calc import calculate, parse, evaluate
 import ast
 
 def parse_tree_string(tree_str):
-    """
-    Преобразуем строку с деревом выражений Add(2, 2) в AST.
-    """
+    #Преобразуем строку с деревом выражений Add(2, 2) в AST.
     try:
         # Удаляем пробелы
         tree_str = tree_str.replace(" ", "")
@@ -87,147 +85,84 @@ def ast_to_str(node):
 
 class TestParser(unittest.TestCase):
     def test_expressions(self):
-        table = PrettyTable()
-        table.field_names = [
-            "Введенное выражение", 
-            "Ожидаемый результат", 
-            "Полученный результат", 
-            "Статус"
-        ]
         test_cases = [
-            ("42", "42", None),
-            ("3.14", "3.14", None),
-            ("2 + 3", "Add(2, 3)", None),
-            ("5 * 6", "Mult(5, 6)", None),
-            ("50 / 0.5", "Div(50, 0.5)", None),
-            ("500 - 800", "Sub(500, 800)", None),
-            ("2 + 3 * 4", "Add(2, Mult(3, 4))", None),
-            ("10 - 4 / 2", "Sub(10, Div(4, 2))", None),
-            ("0.25 / 0.001 + 0.081 * 25", "Add(Div(0.25, 0.001), Mult(0.081, 25))", None),
-            ("a", None, ValueError),
-            ("2 /", None,  ValueError),
-            ("5**4", "Pow(5, 4)", None),
-            ("(1 + 1)", "Add(1, 1)", None),
-            ("1e+03", "1000.0", None),
-
+            ("42", "42"),
+            ("3.14", "3.14"),
+            ("2 + 3", "Add(2, 3)"),
+            ("5 * 6", "Mult(5, 6)"),
+            ("50 / 0.5", "Div(50, 0.5)"),
+            ("500 - 800", "Sub(500, 800)"),
+            ("2 + 3 * 4", "Add(2, Mult(3, 4))"),
+            ("10 - 4 / 2", "Sub(10, Div(4, 2))"),
+            ("0.25 / 0.001 + 0.081 * 25", "Add(Div(0.25, 0.001), Mult(0.081, 25))"),
+            ("5^4", "Pow(5, 4)"),  
+            ("(1 + 1)", "Add(1, 1)"),
+            ("1e+03", "1000.0"),
         ]
 
-        for tree_str, expected, expected_exception in test_cases:
-            try:
-                # Парсим выражение в AST
-                tree = parse(tree_str)  
+        for expression, expected in test_cases:
+            with self.subTest(expression=expression):
+                tree = parse(expression)
                 result = ast_to_str(tree)
-                if expected_exception is not None:
-                    status = "Тест не пройден"
-                else:
-                    status = "Тест пройден" if result == expected else "Тест не пройден"
-            except Exception as e:
-                result = str(e)
-                if expected_exception is not None and isinstance(e, expected_exception):
-                    status = "Тест пройден"
-                else:
-                    status = "Ошибка"
-            table.add_row([tree_str, expected, result, status])
-        
-        print("\nТесты для парсера:")
-        print(table)
+                self.assertEqual(result, expected)
+
+        # Тесты на ошибки
+        with self.assertRaises(ValueError):
+            parse("a")
+        with self.assertRaises(ValueError):
+            parse("2 /")
 
 class TestCalculator(unittest.TestCase):
     def test_calculations(self):
-        calculator_table = PrettyTable()
-        calculator_table.field_names = [
-            "Дерево выражений", 
-            "Ожидаемый результат", 
-            "Полученный результат", 
-            "Статус"
-        ]
         test_cases = [
-	    ("Add(2,2)", 4, None),
-            ("Mult(3,4)", 12, None),
-            ("Div(10,2)", 5.0, None),
-            ("Sub(10, 5)", 5, None),
-            ("Div(2, 0)", None, ZeroDivisionError),
-            ("Div(1, Sub(2, 2))", None, ZeroDivisionError), 
-            ("Add(1, 4j)", None, ValueError),
-            ("Div(1e300, 1e-300)", None, OverflowError),
-            ("Pow(5, 4)", 625, None),
-            ("Div(1e+03, 500)", 2, None),
+            ("Add(2,2)", 4),
+            ("Mult(3,4)", 12),
+            ("Div(10,2)", 5.0),
+            ("Sub(10, 5)", 5),
+            ("Pow(5, 4)", 625),  
+            ("Div(1e+03, 500)", 2),
         ]
 
-        for tree_str, expected, expected_exception in test_cases:
-            try:
-                # Преобразуем строку с деревом выражений в AST
+        for tree_str, expected in test_cases:
+            with self.subTest(tree_str=tree_str):
                 tree = parse_tree_string(tree_str)
                 result = calculate(tree)
-                if expected_exception is not None:
-                    status = "Тест не пройден"
-                else:
-                    status = "Тест пройден" if result == expected else "Тест не пройден"
-            except Exception as e:
-                result = str(e)
-                if expected_exception is not None and isinstance(e, expected_exception):
-                    status = "Тест пройден"
-                else:
-                    status = "Ошибка"
-            calculator_table.add_row([tree_str, expected, result, status])
-        print("\nТесты для вычислителя:")
-        print(calculator_table)
+                self.assertEqual(result, expected)
+
+        # Тесты на ошибки
+        with self.assertRaises(ZeroDivisionError):
+            calculate(parse_tree_string("Div(2, 0)"))
+        with self.assertRaises(ZeroDivisionError):
+            calculate(parse_tree_string("Div(1, Sub(2, 2))"))
+        with self.assertRaises(ValueError):
+            calculate(parse_tree_string("Add(1, 4j)"))
+        with self.assertRaises(OverflowError):
+            calculate(parse_tree_string("Div(1e300, 1e-300)"))
 
 class TestIntegration(unittest.TestCase):
     def test_integration(self):
-        integration_table = PrettyTable()
-        integration_table.field_names = [
-            "Введенное выражение", 
-            "Ожидаемый результат", 
-            "Полученный результат", 
-            "Статус"
-        ]
         test_cases = [
-            ("1 + 1", 2, None),
-            ("2 * 3", 6, None),
-            ("10 / 2", 5.0, None),
-            ("5 - 3", 2, None),
-            ("2 ** 3", 8, None),
-            ("2 + (3 * 4)", 14, None),
-	    ("3.375e+09**(1/3)", 1500, None),
-	    ("1 / 0", None, ZeroDivisionError),
-            ("a + 1", None, ValueError),
-            ("1e300 / 1e-300", None, OverflowError),
+            ("1 + 1", 2),
+            ("2 * 3", 6),
+            ("10 / 2", 5.0),
+            ("5 - 3", 2),
+            ("2 ^ 3", 8),  
+            ("2 + (3 * 4)", 14),
+            ("3.375e+09^(1/3)", 1500),
         ]
 
-        for expression, expected, expected_exception in test_cases:
-            try:
-                # Парсим выражение и вычисляем результат
+        for expression, expected in test_cases:
+            with self.subTest(expression=expression):
                 result = calculate(expression)
-                if expected_exception is not None:
-                    status = "Тест не пройден"
-                else:
-                    status = "Тест пройден" if (abs(result - expected) < 1e-06) else "Тест не пройден"
-            except Exception as e:
-                result = str(e)
-                if expected_exception is not None and isinstance(e, expected_exception):
-                    status = "Тест пройден"
-                else:
-                    status = "Ошибка"
-            integration_table.add_row([expression, expected, result, status])
-        
-        print("\nИнтеграционные тесты (parse + evaluate):")
-        print(integration_table)
+                self.assertAlmostEqual(result, expected, places=6)
+
+        # Тесты на ошибки
+        with self.assertRaises(ZeroDivisionError):
+            calculate("1 / 0")
+        with self.assertRaises(ValueError):
+            calculate("a + 1")
+        with self.assertRaises(OverflowError):
+            calculate("1e300 / 1e-300")
 
 if __name__ == "__main__":
-    # Создаем TestSuite и добавляем тесты в нужном порядке
-    loader = unittest.TestLoader()
-    suite = unittest.TestSuite()
-
-    # Добавляем тесты для парсера
-    suite.addTest(loader.loadTestsFromTestCase(TestParser))
-
-    # Добавляем тесты для вычислителя
-    suite.addTest(loader.loadTestsFromTestCase(TestCalculator))
-
-    # Добавляем интеграционные тесты
-    suite.addTest(loader.loadTestsFromTestCase(TestIntegration))
-
-    # Запускаем тесты
-    runner = unittest.TextTestRunner()
-    runner.run(suite)
+    unittest.main()
