@@ -3,6 +3,7 @@ import ast
 import operator as op
 import argparse
 import math
+import re
 
 # Парсер аргументов командной строки
 parser = argparse.ArgumentParser(
@@ -11,6 +12,8 @@ parser = argparse.ArgumentParser(
     epilog="Использование: python3 calc.py '1+1'",
 )
 parser.add_argument("expression", nargs="?", help="Математическое выражение для вычисления.")
+parser.add_argument("--angle-unit", choices=["degree", "radian"], default="radian",
+                    help="Единицы измерения углов для тригонометрических функций (degree/radian)")
 
 operators = {
     ast.Add: op.add,
@@ -18,7 +21,22 @@ operators = {
     ast.Mult: op.mul,
     ast.Div: op.truediv,
     ast.USub: op.neg,
-    ast.Pow: op.pow,  
+    ast.Pow: op.pow,
+}
+
+functions = {
+    'sqrt': math.sqrt,
+    'sin': math.sin,
+    'cos': math.cos,
+    'tg': math.tan,
+    'ctg': lambda x: 1/math.tan(x),
+    'ln': math.log,
+    'exp': math.exp,
+}
+
+constants = {
+    'pi': math.pi,
+    'e': math.e,
 }
 
 def parse(expression):
@@ -27,9 +45,14 @@ def parse(expression):
         # Удаляем лишние пробелы
         expression = " ".join(expression.split())
         
-        # Проверяем на наличие недопустимых символов, кроме 'e' и 'E' для научной нотации
-        if any(c.isalpha() and c not in 'eE' for c in expression):
-            raise ValueError("Выражение содержит неверные символы")
+        # Проверяем на наличие недопустимых символов
+        allowed_chars = set('+-*/^() .0123456789eE')
+        allowed_pattern = re.compile(r'^[+\-*/^() .\d\s]*|[a-z]+\(|pi|e')
+        
+        # Разрешаем буквы только в названиях функций и констант
+        for token in re.findall(r'[a-zA-Z]+', expression):
+            if token not in functions and token not in constants and not token.startswith(('sqrt', 'sin', 'cos', 'tg', 'ctg', 'ln', 'exp')):
+                raise ValueError(f"Выражение содержит неверные символы или неизвестную функцию: {token}")
         
         # Заменяем ^ на ** для корректного парсинга
         expression = expression.replace('^', '**')
@@ -45,28 +68,49 @@ def parse(expression):
     except (TypeError, KeyError, ValueError) as e:
         raise ValueError(f"Некорректное выражение: {e}")
 
-def evaluate(node):
+def evaluate(node, angle_unit='radian'):
     # Рекурсивно вычисляем значение выражения, представленного в виде AST
-    if isinstance(node, ast.Constant):  
+    if isinstance(node, ast.Constant):
         return node.value
-    elif isinstance(node, ast.BinOp):  
-        left = evaluate(node.left)
-        right = evaluate(node.right)
+    elif isinstance(node, ast.BinOp):
+        left = evaluate(node.left, angle_unit)
+        right = evaluate(node.right, angle_unit)
         return operators[type(node.op)](left, right)
-    elif isinstance(node, ast.UnaryOp):  
-        operand = evaluate(node.operand)
+    elif isinstance(node, ast.UnaryOp):
+        operand = evaluate(node.operand, angle_unit)
         return operators[type(node.op)](operand)
+    elif isinstance(node, ast.Name):
+        if node.id in constants:
+            return constants[node.id]
+        raise ValueError(f"Неизвестная константа: {node.id}")
+    elif isinstance(node, ast.Call):
+        func_name = node.func.id
+        if func_name not in functions:
+            raise ValueError(f"Неизвестная функция: {func_name}")
+        
+        args = [evaluate(arg, angle_unit) for arg in node.args]
+        if len(args) != 1:
+            raise ValueError(f"Функция {func_name} принимает ровно 1 аргумент")
+        
+        value = args[0]
+        if func_name in ['sin', 'cos', 'tg', 'ctg'] and angle_unit == 'degree':
+            value = math.radians(value)
+        
+        try:
+            return functions[func_name](value)
+        except ValueError as e:
+            raise ValueError(f"Ошибка в функции {func_name}: {e}")
     else:
-        raise TypeError("Неверное выражение")
+        raise TypeError(f"Неверное выражение: неподдерживаемый узел AST {type(node)}")
 
-def calculate(expression):
+def calculate(expression, angle_unit='radian'):
     try:
         # Если выражение является строкой, парсим его в AST
         if isinstance(expression, str):
             tree = parse(expression)
         else:
             tree = expression
-        result = evaluate(tree)
+        result = evaluate(tree, angle_unit)
         if math.isinf(result) or math.isnan(result):
             raise OverflowError("Арифметическое переполнение.")
         return result
@@ -78,13 +122,13 @@ def calculate(expression):
         raise OverflowError("Арифметическое переполнение.")
 
 if __name__ == "__main__":
-    args = parser.parse_args()  
+    args = parser.parse_args()
     if not args.expression:
         parser.print_help()
         sys.exit(1)
     expression = args.expression
     try:
-        result = calculate(expression)
+        result = calculate(expression, args.angle_unit)
         print(f"Результат: {result}")
     except Exception as e:
         print(e, file=sys.stderr)
