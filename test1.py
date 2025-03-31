@@ -3,8 +3,10 @@ from prettytable import PrettyTable
 from calc import calculate, parse, evaluate
 import ast
 import math
+import time
 
 def parse_tree_string(tree_str):
+    # Преобразуем строку с деревом выражений Add(2, 2) в AST.
     try:
         # Удаляем пробелы
         tree_str = tree_str.replace(" ", "")
@@ -105,6 +107,15 @@ def ast_to_str(node):
 
 class TestParser(unittest.TestCase):
     def test_expressions(self):
+        table = PrettyTable()
+        table.field_names = [
+            "Введенное выражение", 
+            "Ожидаемый результат", 
+            "Полученный результат",
+            "Статус"
+        ]
+        table.align = "l"
+        
         test_cases = [
             ("42", "42"),
             ("3.14", "3.14"),
@@ -115,52 +126,121 @@ class TestParser(unittest.TestCase):
             ("2 + 3 * 4", "Add(2, Mult(3, 4))"),
             ("10 - 4 / 2", "Sub(10, Div(4, 2))"),
             ("0.25 / 0.001 + 0.081 * 25", "Add(Div(0.25, 0.001), Mult(0.081, 25))"),
-            ("5^4", "Pow(5, 4)"),
+            ("5^4", "Pow(5, 4)"),  
             ("(1 + 1)", "Add(1, 1)"),
             ("1e+03", "1000.0"),
             ("pi", "pi"),
             ("e", "e"),
             ("sqrt(4)", "sqrt(4)"),  
             ("sin(pi/2)", "sin(Div(pi, 2))"),  
-            ("ln(e^2)", "ln(Pow(e, 2))"),  
+            ("ln(e^2)", "ln(Pow(e, 2))"),
         ]
 
+        # Тесты на корректные выражения
         for expression, expected in test_cases:
             with self.subTest(expression=expression):
-                tree = parse(expression)
-                result = ast_to_str(tree)
-                self.assertEqual(result, expected)
+                try:
+                    tree = parse(expression)
+                    result = ast_to_str(tree)
+                    status = "Тест пройден" if result == expected else "Тест не пройден"
+                    table.add_row([expression, expected, result, status])
+                    self.assertEqual(result, expected)
+                except Exception as e:
+                    raise
+
+        # Тесты на ошибки
+        error_cases = [
+            ("a", "ValueError", "Некорректное выражение: Выражение содержит неверные символы"),
+            ("2 /", "ValueError", "Некорректное выражение: Неполное выражение"),
+        ]
+
+        for expression, error_type, error_msg in error_cases:
+            with self.subTest(expression=expression):
+                try:
+                    parse(expression)
+                    table.add_row([expression, f"Должна быть ошибка {error_type}", "Ошибка не возникла", "Тест не пройден"])
+                except Exception as e:
+                    actual_error = str(e)
+                    status = "Тест пройден" if error_msg in actual_error else "Тест не пройден"
+                    table.add_row([expression, error_msg, actual_error, status])
+
+        print("\nТесты для парсера:")
+        print(table)
 
 class TestCalculator(unittest.TestCase):
     def test_calculations(self):
+        table = PrettyTable()
+        table.field_names = [
+            "Дерево выражений",
+            "Ожидаемый результат",
+            "Полученный результат",
+            "Статус"
+        ]
+        table.align = "l"
+
         test_cases = [
             ("Add(2,2)", 4),
             ("Mult(3,4)", 12),
             ("Div(10,2)", 5.0),
             ("Sub(10, 5)", 5),
-            ("Pow(5, 4)", 625),
+            ("Pow(5, 4)", 625),  
             ("Div(1e+03, 500)", 2),
             ("pi", math.pi),
             ("e", math.e),
             ("sqrt(4)", 2),  
             ("sin(Div(pi, 2))", 1),  
-            ("ln(Pow(e, 2))", 2),  
+            ("ln(Pow(e, 2))", 2),
         ]
 
         for tree_str, expected in test_cases:
             with self.subTest(tree_str=tree_str):
-                tree = parse_tree_string(tree_str)
-                result = calculate(tree)
-                self.assertAlmostEqual(result, expected, places=6)
+                try:
+                    tree = parse_tree_string(tree_str)
+                    result = calculate(tree)
+                    status = "Тест пройден" if abs(result - expected) < 1e-6 else "Тест не пройден"
+                    table.add_row([tree_str, expected, result, status])
+                    self.assertAlmostEqual(result, expected, places=6)
+                except Exception as e:
+                    raise
+
+        error_cases = [
+            ("Div(2, 0)", "ZeroDivisionError", "Деление на ноль."),
+            ("Div(1, Sub(2, 2))", "ZeroDivisionError", "Деление на ноль."),
+            ("Add(1, 4j)", "ValueError", "Неизвестная операция: 4j"),
+            ("Div(1e300, 1e-300)", "OverflowError", "Арифметическое переполнение."),
+        ]
+
+        for tree_str, error_type, error_msg in error_cases:
+            with self.subTest(tree_str=tree_str):
+                try:
+                    tree = parse_tree_string(tree_str)
+                    calculate(tree)
+                    table.add_row([tree_str, f"Должна быть ошибка {error_type}", "Ошибка не возникла", "Тест не пройден"])
+                except Exception as e:
+                    actual_error = str(e)
+                    status = "Тест пройден" if error_msg in actual_error else "Тест не пройден"
+                    table.add_row([tree_str, error_msg, actual_error, status])
+
+        print("\nТесты для вычислителя:")
+        print(table)
 
 class TestIntegration(unittest.TestCase):
     def test_integration(self):
+        table = PrettyTable()
+        table.field_names = [
+            "Выражение",
+            "Ожидаемый результат",
+            "Полученный результат",
+            "Статус"
+        ]
+        table.align = "l"
+
         test_cases = [
             ("1 + 1", 2),
             ("2 * 3", 6),
             ("10 / 2", 5.0),
             ("5 - 3", 2),
-            ("2 ^ 3", 8),
+            ("2 ^ 3", 8),  
             ("2 + (3 * 4)", 14),
             ("3.375e+09^(1/3)", 1500),
             ("sqrt(ln(e))", 1),
@@ -170,16 +250,50 @@ class TestIntegration(unittest.TestCase):
             ("exp(ln(2))", 2),
             ("ln(exp(2))", 2),
             ("ln(e^2)", 2),
-            ("sqrt(2^2 * 2 + 1)", 3),  
+            ("sqrt(2^2 * 2 + 1)", 3),
         ]
 
         for expression, expected in test_cases:
             with self.subTest(expression=expression):
-                result = calculate(expression)
-                self.assertAlmostEqual(result, expected, places=6)
+                try:
+                    result = calculate(expression)
+                    status = "Тест пройден" if abs(result - expected) < 1e-6 else "Тест не пройден"
+                    table.add_row([expression, expected, result, status])
+                    self.assertAlmostEqual(result, expected, places=6)
+                except Exception as e:
+                    raise
+
+        error_cases = [
+            ("1 / 0", "ZeroDivisionError", "Деление на ноль."),
+            ("a + 1", "ValueError", "Некорректное выражение: Выражение содержит неверные символы"),
+            ("1e300 / 1e-300", "OverflowError", "Арифметическое переполнение."),
+        ]
+
+        for expression, error_type, error_msg in error_cases:
+            with self.subTest(expression=expression):
+                try:
+                    calculate(expression)
+                    table.add_row([expression, f"Должна быть ошибка {error_type}", "Ошибка не возникла", "Тест не пройден"])
+                except Exception as e:
+                    actual_error = str(e)
+                    status = "Тест пройден" if error_msg in actual_error else "Тест не пройден"
+                    table.add_row([expression, error_msg, actual_error, status])
+
+        print("\nИнтеграционные тесты:")
+        print(table)
 
 class TestAngleUnits(unittest.TestCase):
     def test_angle_units(self):
+        table = PrettyTable()
+        table.field_names = [
+            "Выражение",
+            "Ожидаемый результат",
+            "Полученный результат",
+            "Единицы измерения",
+            "Статус"
+        ]
+        table.align = "l"
+
         test_cases = [
             ("sin(90)", 1, 'degree'),
             ("sin(pi/2)", 1, 'radian'),
@@ -191,8 +305,38 @@ class TestAngleUnits(unittest.TestCase):
 
         for expression, expected, unit in test_cases:
             with self.subTest(expression=expression, unit=unit):
-                result = calculate(expression, angle_unit=unit)
-                self.assertAlmostEqual(result, expected, places=6)
+                try:
+                    result = calculate(expression, angle_unit=unit)
+                    status = "Тест пройден" if abs(result - expected) < 1e-6 else "Тест не пройден"
+                    table.add_row([expression, expected, result, unit, status])
+                    self.assertAlmostEqual(result, expected, places=6)
+                except Exception as e:
+                    raise
+
+        print("\nТесты для единиц измерения углов:")
+        print(table)
+
+class TestTime(unittest.TestCase):
+    def test(self):
+        test_cases = [
+            ("1+" * 199 + "1"),
+            ("2*2/10+" * 250),
+            ("2*sin(pi/4)+" * 300 + "10"),
+        ]
+        print("\nНагрузочные тесты:\n")
+        for expression in test_cases:
+            try:
+                start_time = time.time()
+                result = calculate(expression)
+                exec_time = time.time() - start_time
+                print("Expression: ", expression, "\n")
+                print("Result: ", result, "\n")
+                print("Time: ", exec_time*1000, "ms\n")
+            except Exception as e:
+                exec_time = time.time() - start_time
+                print("Expression: ", expression, "\n")
+                print("Error: ", str(e), "\n")
+                print("Time : ", exec_time*1000, "ms\n")
 
 if __name__ == "__main__":
     unittest.main()

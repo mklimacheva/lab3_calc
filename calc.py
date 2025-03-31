@@ -8,12 +8,19 @@ import re
 # Парсер аргументов командной строки
 parser = argparse.ArgumentParser(
     prog="Калькулятор",
-    description="Вычисление выражений",
-    epilog="Использование: python3 calc.py '1+1'",
+    description="""Вычисление математических выражений с поддержкой:
+    - Базовых операций: +, -, *, /, ^ 
+    - Тригонометрических функций: sin, cos, tg, ctg
+    - Других математических функций: sqrt (квадратный корень), ln (натуральный логарифм), exp (экспонента)
+    - Констант: pi, e 
+    - Поддержка градусов и радиан для тригонометрических функций""",
+    epilog="Примеры использования:\n"
+           "  python3 calc.py '2^3 + cos(0)'",
+    formatter_class=argparse.RawDescriptionHelpFormatter
 )
 parser.add_argument("expression", nargs="?", help="Математическое выражение для вычисления.")
 parser.add_argument("--angle-unit", choices=["degree", "radian"], default="radian",
-                    help="Единицы измерения углов для тригонометрических функций (degree/radian)")
+                   help="Единицы измерения углов для тригонометрических функций (по умолчанию: radian)")
 
 operators = {
     ast.Add: op.add,
@@ -52,7 +59,7 @@ def parse(expression):
         # Разрешаем буквы только в названиях функций и констант
         for token in re.findall(r'[a-zA-Z]+', expression):
             if token not in functions and token not in constants and not token.startswith(('sqrt', 'sin', 'cos', 'tg', 'ctg', 'ln', 'exp')):
-                raise ValueError(f"Выражение содержит неверные символы или неизвестную функцию: {token}")
+                raise ValueError(f"Выражение содержит неверные символы: {token}")
         
         # Заменяем ^ на ** для корректного парсинга
         expression = expression.replace('^', '**')
